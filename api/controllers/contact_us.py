@@ -1,5 +1,6 @@
-from api import Blueprint, cur, request, secure_filename, os, app, uuid, ALLOWED_EXTENSIONS, conn, psycopg2, datetime, send_file
+from api import Blueprint, cur, request, secure_filename, os, app, uuid, ALLOWED_EXTENSIONS, conn, psycopg2, datetime, send_file, jsonify
 from exceptions import MissingFormDataError, DatabaseError
+from validation import InsertCrmForm
 
 contact_us_route = Blueprint('contact_us_route', __name__)
 
@@ -12,7 +13,9 @@ class ContactUs:
 
     @contact_us_route.route('/insert-crm', methods=['POST'])
     def insert_crm():
-        expected_keys = {'name', 'email', 'subject', 'department', 'priority', 'message', 'attachments'}
+        expected_keys = {'name', 'email', 'subject',
+                          'department', 'priority', 'message', 
+                          'attachments'}
     
         form_data = request.form
         
@@ -25,6 +28,14 @@ class ContactUs:
 
         if not file or not ContactUs.allowed_file(file.filename):
             raise MissingFormDataError("Invalid file or no file selected")
+        
+        form_insert_crm = InsertCrmForm(form_data)
+
+        if not form_insert_crm.validate():
+            errors = {}
+            for field, error in form_insert_crm.errors.items():
+                errors[field] = error[0]
+            return jsonify({"errors": errors}), 400
         
         unique_filename = ""
         if file:
@@ -92,11 +103,10 @@ class ContactUs:
             conn.rollback()
             raise DatabaseError(f"Error inserting data: {e}")
 
-        
-        return {
-            "status": 200,
+        # return jsonify({"errors": errors}), 400
+        return jsonify({
             "message": "success"
-        }
+        }),200
 
     @contact_us_route.route('/download-attachment/<path:filename>', methods=['GET'])
     def download_attachment(filename):
@@ -105,3 +115,8 @@ class ContactUs:
             return send_file(path, as_attachment=True)
         except FileNotFoundError:
             return "File not found", 404
+
+    @app.route('/api/get_csrf_token', methods=['GET'])
+    def get_csrf_token():
+        form = InsertCrmForm()
+        return jsonify({"csrf_token": form.csrf_token.current_token})

@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import uuid
 import datetime
 from flask_cors import CORS
-
+from flask_wtf import CSRFProtect
 
 
 
@@ -19,7 +19,7 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
+app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://admin:admin@localhost/wh'
 # app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # db = SQLAlchemy(app)
@@ -30,7 +30,7 @@ conn = psycopg2.connect(
         password=os.environ['DB_PASSWORD'])
 cur = conn.cursor()
 CORS(app)
-
+csrf = CSRFProtect(app)
 
 @app.cli.command('test')
 def test():
