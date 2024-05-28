@@ -1,0 +1,5 @@
+venv/
+api/__pycache__
+api/controllers/__pycache__
+attachments
+.env
