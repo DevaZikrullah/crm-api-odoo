@@ -29,13 +29,7 @@ class ContactUs:
         if not file or not ContactUs.allowed_file(file.filename):
             raise MissingFormDataError("Invalid file or no file selected")
         
-        form_insert_crm = InsertCrmForm(form_data)
-
-        if not form_insert_crm.validate():
-            errors = {}
-            for field, error in form_insert_crm.errors.items():
-                errors[field] = error[0]
-            return jsonify({"errors": errors}), 400
+       
         
         unique_filename = ""
         if file:
@@ -102,11 +96,14 @@ class ContactUs:
         except psycopg2.Error as e:
             conn.rollback()
             raise DatabaseError(f"Error inserting data: {e}")
+        
+        form_insert_crm = InsertCrmForm(form_data)
 
-        # return jsonify({"errors": errors}), 400
-        return jsonify({
-            "message": "success"
-        }),200
+        if form_insert_crm.validate_on_submit():
+            return jsonify({"message": "succses"}), 200
+        else:
+            errors = {field: error[0] for field, error in form_insert_crm.errors.items()}
+            return jsonify({"errors": errors}), 400
 
     @contact_us_route.route('/download-attachment/<path:filename>', methods=['GET'])
     def download_attachment(filename):
