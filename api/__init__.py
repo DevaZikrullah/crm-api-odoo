@@ -20,15 +20,12 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://admin:admin@localhost/wh'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# db = SQLAlchemy(app)
-conn = psycopg2.connect(
-        host=os.environ['DB_HOST'],
-        database=os.environ['DB_NAME'],
-        user=os.environ['DB_USER'],
-        password=os.environ['DB_PASSWORD'])
-cur = conn.cursor()
+
+database=os.environ['DB_NAME']
+username=os.environ['USERNAME']
+password=os.environ['PASSWORD']
+url=os.environ['URL']
+
 CORS(app)
 csrf = CSRFProtect(app)
 

@@ -1,21 +1,34 @@
-from api import Blueprint, cur, request, secure_filename, os, app, uuid, ALLOWED_EXTENSIONS, conn, psycopg2, datetime, send_file, jsonify
+from api import Blueprint, request,datetime, send_file, jsonify,database,url,username,password,app
 from exceptions import MissingFormDataError, DatabaseError
 from validation import InsertCrmForm
+import xmlrpc.client
 
 contact_us_route = Blueprint('contact_us_route', __name__)
-
+MAX_RETRIES = 3
 
 class ContactUs:
 
     @staticmethod
-    def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    def search_partner(db, uid, password,value,fields,models):
+        return models.execute_kw(db, uid, password, 'res.partner', 'search_read', [[[fields, '=', value]]], {'fields': ['id', 'name','email'], 'limit': 1})
+
+    @staticmethod
+    def create_partner(db, uid, password,name,email_partner,models):
+        
+        contact_data = {
+            'name': name,
+            'email': email_partner,
+            'active':True,
+        }
+        return models.execute_kw(db, uid, password, 'res.partner', 'create', [contact_data])
 
     @contact_us_route.route('/insert-crm', methods=['POST'])
     def insert_crm():
-        expected_keys = {'name', 'email', 'subject',
-                          'department', 'priority', 'message', 
-                          'attachments'}
+        models = xmlrpc.client.ServerProxy('{}/xmlrpc/2/object'.format(url))
+        expected_keys = {'firstname','lastname', 'email', 'country',
+                          'phone', 'priority', 'request', 'product'
+                          }
+        uid = ContactUs.authenticate(url, database, username, password)
     
         form_data = request.form
         
@@ -24,83 +37,50 @@ class ContactUs:
         if unexpected_keys:
             raise MissingFormDataError(f"Unexpected fields provided: {', '.join(unexpected_keys)}")
         
-        file = request.files.get('attachments')
-
-        if not file or not ContactUs.allowed_file(file.filename):
-            raise MissingFormDataError("Invalid file or no file selected")
+        partner = ContactUs.search_partner(db=database,uid=uid,password=password,value=form_data['email'],fields='email',models=models)
         
-       
         
-        unique_filename = ""
-        if file:
-            if file.filename == '':
-                raise MissingFormDataError("No selected file")
-            
-            original_filename = secure_filename(file.filename)
-            unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(file_path)
+        if partner:
+            id_part = partner[0].get('id')
+            name_partner = partner[0].get('name')
+            email_partner = partner[0].get('email')
+        else:
+            full_name = f"{form_data['firstname']} {form_data['lastname']}"
+            id_partner = ContactUs.create_partner(db=database,uid=uid,password=password,name=full_name,email_partner=form_data['email'],models=models)
+            new_partner = ContactUs.search_partner(db=database,uid=uid,password=password,value=id_partner,fields='id',models=models)
+            id_part = new_partner[0].get('id')
+            name_partner = new_partner[0].get('name')
+            email_partner = new_partner[0].get('email')
 
-        # name = form_data['name'] + ' opportunity'
         time_now = datetime.datetime.now()
-        id_partner = ""
-        try:
-            cur.execute("SELECT * FROM res_partner WHERE email = %s", (form_data['email'],))
-            partner_records = cur.fetchall()
-
-            if not partner_records:
-                cur.execute("INSERT INTO res_partner (name, email, active) VALUES (%s, %s, %s) RETURNING id", (form_data['name'], form_data['email'], True))
-                id_partner = cur.fetchone()[0]
-            else:
-                id_partner = partner_records[0][0]
-
-            cur.execute('''
-                INSERT INTO crm_lead (
-                        partner_id,
-                        user_id, 
-                        team_id,
-                        company_id,
-                        stage_id,
-                        name, 
-                        email_from, 
-                        contact_name,
-                        type,
-                        active,
-                        date_open,
-                        date_last_stage_update,
-                        create_date,
-                        write_date,
-                        description,
-                        docs_file,
-                        priority)
-                VALUES (%s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
-            ''', (id_partner,
-                1, 
-                1,
-                1,
-                1,
-                form_data['subject'], 
-                form_data['email'], 
-                form_data['name'],
-                "opportunity",
-                True,
-                time_now,
-                time_now,
-                time_now,
-                time_now,
-                form_data['message'],
-                unique_filename,
-                form_data['priority']
-                )) 
-            conn.commit()
-        except psycopg2.Error as e:
-            conn.rollback()
-            raise DatabaseError(f"Error inserting data: {e}")
+        
         
         form_insert_crm = InsertCrmForm(form_data)
 
         if form_insert_crm.validate_on_submit():
-            return jsonify({"message": "succses"}), 200
+            partner_data = {
+                'partner_id':id_part,
+                'name': name_partner,
+                'user_id': uid,
+                'team_id':1,
+                'company_id':1,
+                'email_from': email_partner,
+                'priority':'2',
+                'description':"TEST June 05",
+                'type':"opportunity",
+                'active': True,
+                # 'date_open': time_now,
+                # 'date_last_stage_update': time_now,
+                # 'create_date': time_now,
+                # 'write_date': time_now,
+
+            }
+            
+            data_crm = models.execute_kw(database, uid, password, 'crm.lead', 'create', [partner_data])
+            return jsonify({
+                "message": "succses",
+                "data" : data_crm
+                            }), 200
         else:
             errors = {field: error[0] for field, error in form_insert_crm.errors.items()}
             return jsonify({"errors": errors}), 400
@@ -113,7 +93,19 @@ class ContactUs:
         except FileNotFoundError:
             return "File not found", 404
 
+    @staticmethod
+    def authenticate(url, db, username, password):
+        common = xmlrpc.client.ServerProxy('{}/xmlrpc/2/common'.format(url))
+        uid = common.authenticate(db, username, password, {})
+        if uid:
+            print('Authenticated as', username)
+        else:
+            raise Exception('Authentication failed')
+        return uid
+    
     @app.route('/api/get_csrf_token', methods=['GET'])
     def get_csrf_token():
         form = InsertCrmForm()
         return jsonify({"csrf_token": form.csrf_token.current_token})
+
+    
