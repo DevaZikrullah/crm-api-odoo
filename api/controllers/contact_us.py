@@ -13,12 +13,13 @@ class ContactUs:
         return models.execute_kw(db, uid, password, 'res.partner', 'search_read', [[[fields, '=', value]]], {'fields': ['id', 'name','email'], 'limit': 1})
 
     @staticmethod
-    def create_partner(db, uid, password,name,email_partner,models):
+    def create_partner(db, uid, password,name,email_partner,phone,models):
         
         contact_data = {
             'name': name,
             'email': email_partner,
             'active':True,
+            'phone':phone
         }
         return models.execute_kw(db, uid, password, 'res.partner', 'create', [contact_data])
 
@@ -60,20 +61,15 @@ class ContactUs:
         if form_insert_crm.validate_on_submit():
             partner_data = {
                 'partner_id':id_part,
-                'name': name_partner,
+                'name': form_data['product'],
                 'user_id': uid,
                 'team_id':1,
                 'company_id':1,
                 'email_from': email_partner,
                 'priority':'2',
-                'description':"TEST June 05",
+                'description':form_data['request'],
                 'type':"opportunity",
                 'active': True,
-                # 'date_open': time_now,
-                # 'date_last_stage_update': time_now,
-                # 'create_date': time_now,
-                # 'write_date': time_now,
-
             }
             
             data_crm = models.execute_kw(database, uid, password, 'crm.lead', 'create', [partner_data])

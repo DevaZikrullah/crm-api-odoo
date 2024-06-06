@@ -1,4 +1,4 @@
-# Personal Use Repository
+<!-- # Personal Use Repository
 
 Welcome to my personal use repository! This repository contains various projects, scripts, and notes that I use for personal development and experimentation.
 
@@ -12,4 +12,4 @@ Welcome to my personal use repository! This repository contains various projects
 **Endpoints:**
 - `POST /api/insert-crm`: Description of the endpoint.
 - `GET /api/get_csrf_token`: Description of the endpoint.
-
+ -->
