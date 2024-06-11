@@ -1,4 +1,4 @@
-from flask import Flask,request,Blueprint,jsonify,render_template,send_file
+from flask import Flask,request,Blueprint,jsonify,render_template,send_file,session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.sql import text
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import uuid
 import datetime
 from flask_cors import CORS
-from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 
 
 
